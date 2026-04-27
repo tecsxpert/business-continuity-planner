@@ -49,7 +49,7 @@ def sanitize_and_validate():
         request.cleaned_text = clean_text
 
 
-# Main API
+# Describe endpoint
 @app.route("/describe", methods=["POST"])
 @limiter.limit("30 per minute")
 def describe():
@@ -61,15 +61,31 @@ def describe():
         "result": result
     })
 
+
+# Recommend endpoint (UPDATED WITH PROMPT TUNING)
 @app.route("/recommend", methods=["POST"])
 @limiter.limit("30 per minute")
 def recommend():
     clean_text = request.cleaned_text
 
     prompt = f"""
-    Give exactly 3 business continuity recommendations for this risk:
+    You are an expert in business continuity planning.
 
+    Analyze the following risk:
     {clean_text}
+
+    Provide exactly 3 high-quality recommendations.
+
+    Each recommendation must include:
+    - action_type (PREVENTIVE / MITIGATION / RECOVERY)
+    - description (clear, specific, and actionable)
+    - priority (HIGH / MEDIUM / LOW)
+
+    Ensure:
+    - Recommendations are practical and realistic
+    - Avoid generic or vague statements
+    - Use professional language
+    - Be specific and include real-world actionable steps
 
     Return ONLY valid JSON in this format:
     [
@@ -79,13 +95,11 @@ def recommend():
         "priority": "HIGH"
       }}
     ]
-
-    Do NOT include explanations or extra text.
     """
 
     result = generate_text(prompt)
 
-    # 🔧 Clean unwanted formatting (like ```json)
+    # Clean unwanted formatting (like ```json)
     result = result.replace("```json", "").replace("```", "").strip()
 
     try:
@@ -100,4 +114,4 @@ def recommend():
 
 # Run server
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5001, debug=True)
+    app.run(host="127.0.0.1", port=5002, debug=True)
