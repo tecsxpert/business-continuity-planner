@@ -11,11 +11,23 @@ app = Flask(__name__)
 limiter = Limiter(key_func=get_remote_address)
 limiter.init_app(app)
 
+# Cache (Day 8)
+cache = {}
+
 
 # Home route (for testing)
 @app.route("/")
 def home():
     return "Server is running!"
+
+
+#  Health endpoint (Day 8)
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "ok",
+        "service": "ai-service"
+    })
 
 
 # Middleware (runs before every POST request)
@@ -24,16 +36,13 @@ def sanitize_and_validate():
     if request.method == "POST":
         data = request.get_json()
 
-        # 1. Check input
         if not data or "text" not in data:
             return jsonify({"error": "Missing input"}), 400
 
         text = data["text"]
 
-        # 2. Remove HTML
         clean_text = re.sub(r"<.*?>", "", text)
 
-        # 3. Detect prompt injection
         bad_words = [
             "ignore previous",
             "system prompt",
@@ -45,8 +54,16 @@ def sanitize_and_validate():
         if any(word in clean_text.lower() for word in bad_words):
             return jsonify({"error": "Malicious input detected"}), 400
 
-        # 4. Save cleaned text
         request.cleaned_text = clean_text
+
+
+#  Security headers (Day 8)
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
 
 
 # Describe endpoint
@@ -62,11 +79,18 @@ def describe():
     })
 
 
-# Recommend endpoint (UPDATED WITH PROMPT TUNING)
+# Recommend endpoint (with caching)
 @app.route("/recommend", methods=["POST"])
 @limiter.limit("30 per minute")
 def recommend():
     clean_text = request.cleaned_text
+
+    #  Check cache first
+    if clean_text in cache:
+        return jsonify({
+            "recommendations": cache[clean_text],
+            "cached": True
+        })
 
     prompt = f"""
     You are an expert in business continuity planning.
@@ -99,7 +123,6 @@ def recommend():
 
     result = generate_text(prompt)
 
-    # Clean unwanted formatting (like ```json)
     result = result.replace("```json", "").replace("```", "").strip()
 
     try:
@@ -107,11 +130,15 @@ def recommend():
     except:
         parsed = []
 
+    # Save in cache
+    cache[clean_text] = parsed
+
     return jsonify({
-        "recommendations": parsed
+        "recommendations": parsed,
+        "cached": False
     })
 
 
 # Run server
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5002, debug=True)
+    app.run(host="127.0.0.1", port=5003, debug=False)
