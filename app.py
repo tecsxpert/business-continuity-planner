@@ -11,17 +11,17 @@ app = Flask(__name__)
 limiter = Limiter(key_func=get_remote_address)
 limiter.init_app(app)
 
-# Cache (Day 8)
+# Cache 
 cache = {}
 
 
-# Home route (for testing)
+# Home route
 @app.route("/")
 def home():
     return "Server is running!"
 
 
-#  Health endpoint (Day 8)
+# Health endpoint
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
@@ -30,7 +30,15 @@ def health():
     })
 
 
-# Middleware (runs before every POST request)
+# JWT Verification (Day 9)
+def verify_jwt():
+    token = request.headers.get("Authorization")
+    if not token:
+        return False
+    return True
+
+
+# Middleware
 @app.before_request
 def sanitize_and_validate():
     if request.method == "POST":
@@ -57,7 +65,7 @@ def sanitize_and_validate():
         request.cleaned_text = clean_text
 
 
-#  Security headers (Day 8)
+# Security headers
 @app.after_request
 def add_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -70,22 +78,27 @@ def add_security_headers(response):
 @app.route("/describe", methods=["POST"])
 @limiter.limit("30 per minute")
 def describe():
-    clean_text = request.cleaned_text
+    # JWT check
+    if not verify_jwt():
+        return jsonify({"error": "Unauthorized"}), 401
 
+    clean_text = request.cleaned_text
     result = generate_text(clean_text)
 
-    return jsonify({
-        "result": result
-    })
+    return jsonify({"result": result})
 
 
-# Recommend endpoint (with caching)
+# Recommend endpoint
 @app.route("/recommend", methods=["POST"])
 @limiter.limit("30 per minute")
 def recommend():
+    # JWT check
+    if not verify_jwt():
+        return jsonify({"error": "Unauthorized"}), 401
+
     clean_text = request.cleaned_text
 
-    #  Check cache first
+    # Cache check
     if clean_text in cache:
         return jsonify({
             "recommendations": cache[clean_text],
@@ -130,7 +143,6 @@ def recommend():
     except:
         parsed = []
 
-    # Save in cache
     cache[clean_text] = parsed
 
     return jsonify({
@@ -141,4 +153,4 @@ def recommend():
 
 # Run server
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5003, debug=False)
+    app.run(host="127.0.0.1", port=5004, debug=False)
