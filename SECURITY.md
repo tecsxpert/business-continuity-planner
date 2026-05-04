@@ -108,3 +108,21 @@ The AI service meets all defined security requirements and is approved for deplo
 ✔ Injection protection working
 ✔ PII audit done
 ✔ SECURITY.md updated
+
+
+
+
+## 60 Seconds Explanation
+This system is an AI-powered business continuity service that generates recommendations based on risk inputs.
+
+We built REST APIs using Flask and integrated a large language model to generate structured outputs in JSON format.
+
+We implemented multiple security measures including JWT authentication, rate limiting, and protection against prompt injection attacks.
+
+We also ensured that no personal data is processed by performing a PII audit.
+
+To improve performance, we added caching so repeated requests return faster responses.
+
+Finally, we tested the system using unit tests, security scans, and end-to-end validation to ensure reliability and security.
+
+The system is now fully secure, tested, and ready for deployment.
