@@ -100,3 +100,11 @@ The AI service meets all defined security requirements and is approved for deplo
 |------|------|--------|
 | AI Developer 2 | P HARSHAD ALI KHAN | Approved |
 
+
+# Day 13
+## Final checklist
+✔ JWT working
+✔ Rate limiting working
+✔ Injection protection working
+✔ PII audit done
+✔ SECURITY.md updated
