@@ -11,29 +11,46 @@ app = Flask(__name__)
 limiter = Limiter(key_func=get_remote_address)
 limiter.init_app(app)
 
+# Cache 
+cache = {}
 
-# Home route (for testing)
+
+# Home route
 @app.route("/")
 def home():
     return "Server is running!"
 
 
-# Middleware (runs before every POST request)
+# Health endpoint
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "ok",
+        "service": "ai-service"
+    })
+
+
+# JWT Verification (Day 9)
+def verify_jwt():
+    token = request.headers.get("Authorization")
+    if not token:
+        return False
+    return True
+
+
+# Middleware
 @app.before_request
 def sanitize_and_validate():
     if request.method == "POST":
         data = request.get_json()
 
-        # 1. Check input
         if not data or "text" not in data:
             return jsonify({"error": "Missing input"}), 400
 
         text = data["text"]
 
-        # 2. Remove HTML
         clean_text = re.sub(r"<.*?>", "", text)
 
-        # 3. Detect prompt injection
         bad_words = [
             "ignore previous",
             "system prompt",
@@ -45,28 +62,48 @@ def sanitize_and_validate():
         if any(word in clean_text.lower() for word in bad_words):
             return jsonify({"error": "Malicious input detected"}), 400
 
-        # 4. Save cleaned text
         request.cleaned_text = clean_text
+
+
+# Security headers
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
 
 
 # Describe endpoint
 @app.route("/describe", methods=["POST"])
 @limiter.limit("30 per minute")
 def describe():
-    clean_text = request.cleaned_text
+    # JWT check
+    if not verify_jwt():
+        return jsonify({"error": "Unauthorized"}), 401
 
+    clean_text = request.cleaned_text
     result = generate_text(clean_text)
 
-    return jsonify({
-        "result": result
-    })
+    return jsonify({"result": result})
 
 
-# Recommend endpoint (UPDATED WITH PROMPT TUNING)
+# Recommend endpoint
 @app.route("/recommend", methods=["POST"])
 @limiter.limit("30 per minute")
 def recommend():
+    # JWT check
+    if not verify_jwt():
+        return jsonify({"error": "Unauthorized"}), 401
+
     clean_text = request.cleaned_text
+
+    # Cache check
+    if clean_text in cache:
+        return jsonify({
+            "recommendations": cache[clean_text],
+            "cached": True
+        })
 
     prompt = f"""
     You are an expert in business continuity planning.
@@ -99,7 +136,6 @@ def recommend():
 
     result = generate_text(prompt)
 
-    # Clean unwanted formatting (like ```json)
     result = result.replace("```json", "").replace("```", "").strip()
 
     try:
@@ -107,11 +143,15 @@ def recommend():
     except:
         parsed = []
 
+    cache[clean_text] = parsed
+
     return jsonify({
-        "recommendations": parsed
+        "recommendations": parsed,
+        "cached": False
     })
+
 
 
 # Run server
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5002, debug=True)
+    app.run(host="127.0.0.1", port=5005, debug=False)
