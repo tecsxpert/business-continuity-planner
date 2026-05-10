@@ -43,3 +43,11 @@
 * Ensured debug mode is disabled
 
 ---
+
+
+### Environment Setup
+
+* Create a .env file using the .env.example template:
+
+  * cp .env.example .env
+  * Then replace placeholder values with your actual credentials.
